@@ -15,7 +15,7 @@ public class FootfallTally {
     static final AtomicInteger READERS_OPENED = new AtomicInteger();
     static final AtomicInteger READERS_CLOSED = new AtomicInteger();
 
-    final Map<String, Long> visitorsPerGate = new HashMap<>();
+    final Map<String, Long> visitorsPerGate = new ConcurrentHashMap<>();
 
     void processFile(Path f) {
         try {
@@ -23,7 +23,7 @@ public class FootfallTally {
             String line;
             while ((line = r.readLine()) != null) {
                 String[] p = line.split(",");
-                visitorsPerGate.put(p[0], visitorsPerGate.getOrDefault(p[0], 0L) + Long.parseLong(p[1]));
+                visitorsPerGate.merge(p[0], Long.parseLong(p[1]), Long::sum);
             }
         } catch (IOException e) {
             System.out.println("could not read " + f);
