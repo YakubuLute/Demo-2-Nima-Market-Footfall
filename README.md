@@ -1,16 +1,39 @@
-# Nima Market Footfall Tally (demo lab)
+# Nima Market Footfall Tally (demo submission)
 
-Starter repository for the **demo lab** used to show how to submit on Evalu8.
-Read the brief alongside it.
+A sample submission for the **demo lab**, used to show how to submit on Evalu8.
 
 ## Running it
 
-You need JDK 21. Sample data is in `data/`.
-
 ```bash
 javac -d target/classes src/main/java/FootfallTally.java
-java -cp target/classes FootfallTally run
-java -cp target/classes FootfallTally stress        # 100 runs against the known total
+java -cp target/classes FootfallTally stress 200
 ```
 
-Run `stress` before you change anything: it is your evidence.
+## What I changed
+
+See `DIAGNOSIS.md` (committed before any code change) for the evidence and mechanisms.
+
+- **Lost updates:** the shared map is a `ConcurrentHashMap`, and each addition uses
+  `merge`, which is atomic per gate. The job still runs on sixteen threads; nothing is
+  serialised.
+- **Leaked readers:** each reader is opened in try-with-resources, so it is closed on
+  every path.
+- **Invisible failures:** files are submitted with `submit()`, and each `Future` is
+  checked, so a failed file stops the tally with its name instead of producing a quiet
+  partial total. A tally that does not finish within a minute is reported, not read.
+
+## Before and after
+
+Before (starter, 100 runs):
+
+```
+--- 100 runs: 11 wrong, 89 correct (expected 494780)
+--- log readers opened: 8000, closed: 0
+```
+
+After (200 runs):
+
+```
+--- 200 runs: 0 wrong, 200 correct (expected 494780)
+--- log readers opened: 16000, closed: 16000
+```
