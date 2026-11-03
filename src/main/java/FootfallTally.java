@@ -18,23 +18,27 @@ public class FootfallTally {
     final Map<String, Long> visitorsPerGate = new ConcurrentHashMap<>();
 
     void processFile(Path f) {
-        try {
-            BufferedReader r = openLog(f);
+        try (BufferedReader r = openLog(f)) {
             String line;
             while ((line = r.readLine()) != null) {
                 String[] p = line.split(",");
                 visitorsPerGate.merge(p[0], Long.parseLong(p[1]), Long::sum);
             }
         } catch (IOException e) {
-            System.out.println("could not read " + f);
+            throw new UncheckedIOException("could not read " + f, e);
         }
     }
 
     long tally() throws Exception {
         ExecutorService pool = Executors.newFixedThreadPool(16);
-        for (Path f : listData()) pool.execute(() -> processFile(f));
+        List<Future<?>> work = new ArrayList<>();
+        for (Path f : listData()) work.add(pool.submit(() -> processFile(f)));
         pool.shutdown();
-        pool.awaitTermination(1, TimeUnit.MINUTES);
+        if (!pool.awaitTermination(1, TimeUnit.MINUTES)) {
+            pool.shutdownNow();
+            throw new IllegalStateException("Tally did not finish within a minute");
+        }
+        for (Future<?> w : work) w.get();   // surfaces any file that failed
         long total = 0;
         for (long v : visitorsPerGate.values()) total += v;
         return total;
